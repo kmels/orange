@@ -7,14 +7,20 @@ main :: IO ()
 main = do
     inotify <- initINotify
     print inotify
-    home <- getHomeDirectory
+    home <- getHomeDirectory    
     wd <- addWatch
             inotify
             [AllEvents]
             (home ++ "/Downloads")
+            --updateIndex 
             print
+    
     print wd
     putStrLn "Listens to your home directory. Hit enter to terminate."
     getLine
     removeWatch wd
     
+updateIndex :: Event -> IO ()
+updateIndex (Accessed isDirectory mfilePath) = putStrLn "Update access date"
+updateIndex (Created isDirectory mfilePath) = putStrLn "Create file"
+updateIndex e  = putStrLn $ "Unhandled event " ++ (show e)
