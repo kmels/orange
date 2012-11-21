@@ -7,22 +7,34 @@ import Control.Monad(when,filterM)
 import Data.List(isPrefixOf)
 import Text.Regex.TDFA
 
+import Database.Redis
+import Indexer(indexFilePath)
+
 main :: IO ()
 main = do
     inotify <- initINotify
     print inotify
-    home <- getHomeDirectory
-    --indices <- subdirectories (home </> "code")
-    indices <- subdirectories (home)
-        
+    home <- getHomeDirectory        
+
+    directories <- subdirectories (home </> "code")
+    --index
+    reditConn <- connect defaultConnectInfo
+    
+    --mapM $ (\fp -> runRedis reditConn $ do
+    --  set 
+    
     wd <- mapM (\d -> addWatch
             inotify
             [AllEvents]
             d
             --updateIndex 
-            print) indices
+            print) directories
     
     print wd
+    mapM (\fp -> do
+             putStr $ "indexing " ++ fp
+             indexFilePath fp
+             putStrLn " ... done") directories    
     putStrLn "Listens to your home directory. Hit enter to terminate."
     getLine
     mapM_ removeWatch wd
@@ -35,7 +47,6 @@ updateIndex e  = putStrLn $ "Unhandled event " ++ (show e)
 -- | Gives a list of subdirectories given a directory
 subdirectories :: FilePath -> IO [FilePath]
 subdirectories fp = do
-  putStrLn $ "****************************************" ++ "Computing subfiles " ++ fp
   isDir <- doesDirectoryExist fp
   isIgnored <- isIgnored fp
   if (isDir && not isIgnored)
