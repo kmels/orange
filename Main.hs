@@ -12,18 +12,20 @@ main = do
     inotify <- initINotify
     print inotify
     home <- getHomeDirectory
-    indices <- subdirectories home
-    wd <- addWatch
+    --indices <- subdirectories (home </> "code")
+    indices <- subdirectories (home)
+        
+    wd <- mapM (\d -> addWatch
             inotify
             [AllEvents]
-            home
+            d
             --updateIndex 
-            print
+            print) indices
     
     print wd
     putStrLn "Listens to your home directory. Hit enter to terminate."
     getLine
-    removeWatch wd
+    mapM_ removeWatch wd
     
 updateIndex :: Event -> IO ()
 updateIndex (Accessed isDirectory mfilePath) = putStrLn "Update access date"
@@ -32,26 +34,22 @@ updateIndex e  = putStrLn $ "Unhandled event " ++ (show e)
 
 -- | Gives a list of subdirectories given a directory
 subdirectories :: FilePath -> IO [FilePath]
-subdirectories fp = do    
+subdirectories fp = do
   putStrLn $ "****************************************" ++ "Computing subfiles " ++ fp
   isDir <- doesDirectoryExist fp
   isIgnored <- isIgnored fp
   if (isDir && not isIgnored)
-  then 
-      case fp of
-        ".." -> return $ []
-        "." -> return $ []
-        _ -> do 
-          children' <- getDirectoryContents fp -- :: [FilePath]
-          let 
-            children = filter (`notElem` [".","..","_darcs",".config",".cabal"]) children'
-            childrenFilePaths = map (fp </>) children
-
-          directoryFilePaths <- filterM (doesDirectoryExist) childrenFilePaths
-            
-          allDescendants <- mapM subdirectories directoryFilePaths 
-          return $ directoryFilePaths ++ concat allDescendants
-  else return [fp]
+  then do 
+       children' <- getDirectoryContents fp -- :: [FilePath]
+       let 
+          children = filter (`notElem` [".","..","_darcs",".config",".cabal"]) children'
+          childrenFilePaths = map (fp </>) children
+                                
+       directoryFilePaths <- filterM (doesDirectoryExist) childrenFilePaths
+                   
+       allDescendants <- mapM subdirectories directoryFilePaths 
+       return $ directoryFilePaths ++ concat allDescendants
+  else return []
    
 (</>) :: FilePath -> FilePath -> FilePath
 (</>) parent cfp = parent ++ "/" ++ cfp
