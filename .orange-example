@@ -1,0 +1,6 @@
+/home/kmels/.cabal*
+.*_darcs/.*
+/home/kmels/\..*
+.*\.git.*
+.*\.emacs\.d.*
+.*_cache
