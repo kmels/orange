@@ -3,16 +3,14 @@ import System.IO
 
 import System.INotify
 import System.Directory(getDirectoryContents)
-import Control.Monad(when)
+import Control.Monad(when,filterM)
 
 main :: IO ()
 main = do
     inotify <- initINotify
     print inotify
     home <- getHomeDirectory
-    indices <- subfiles home
-    putStrLn $ "Finished! " ++ (show $ indices)
---    mapM_ $ putStrLn indices
+    indices <- subdirectories home
     wd <- addWatch
             inotify
             [AllEvents]
@@ -30,8 +28,9 @@ updateIndex (Accessed isDirectory mfilePath) = putStrLn "Update access date"
 updateIndex (Created isDirectory mfilePath) = putStrLn "Create file"
 updateIndex e  = putStrLn $ "Unhandled event " ++ (show e)
 
-subfiles :: FilePath -> IO [FilePath]
-subfiles fp = do  
+-- | Gives a list of subdirectories given a directory
+subdirectories :: FilePath -> IO [FilePath]
+subdirectories fp = do    
   putStrLn $ "****************************************" ++ "Computing subfiles " ++ fp
   isDir <- doesDirectoryExist fp  
   if isDir
@@ -40,10 +39,17 @@ subfiles fp = do
         ".." -> return $ []
         "." -> return $ []
         _ -> do 
-          children <- getDirectoryContents fp
-          putStrLn $ "Computing children of " ++ (show children)
-          allDescendants <- mapM subfiles children
-          return $ concat allDescendants
+          children' <- getDirectoryContents fp -- :: [FilePath]
+          let 
+            children = filter (`notElem` [".","..","_darcs",".config",".cabal"]) children'
+            childrenFilePaths = map (</> fp) children
+
+          directoryFilePaths <- filterM (doesDirectoryExist) childrenFilePaths
+            
+          allDescendants <- mapM subdirectories directoryFilePaths 
+          return $ directoryFilePaths ++ concat allDescendants
   else return [fp]
-  
-  
+   
+(</>) :: FilePath -> FilePath -> FilePath
+(</>) cfp parent = parent ++ "/" ++ cfp
+
