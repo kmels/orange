@@ -4,6 +4,7 @@ import System.IO
 import System.INotify
 import System.Directory(getDirectoryContents)
 import Control.Monad(when,filterM)
+import Data.List(isPrefixOf)
 
 main :: IO ()
 main = do
@@ -32,8 +33,9 @@ updateIndex e  = putStrLn $ "Unhandled event " ++ (show e)
 subdirectories :: FilePath -> IO [FilePath]
 subdirectories fp = do    
   putStrLn $ "****************************************" ++ "Computing subfiles " ++ fp
-  isDir <- doesDirectoryExist fp  
-  if isDir
+  isDir <- doesDirectoryExist fp
+  isIgnored <- isIgnored fp
+  if (isDir && not isIgnored)
   then 
       case fp of
         ".." -> return $ []
@@ -42,7 +44,7 @@ subdirectories fp = do
           children' <- getDirectoryContents fp -- :: [FilePath]
           let 
             children = filter (`notElem` [".","..","_darcs",".config",".cabal"]) children'
-            childrenFilePaths = map (</> fp) children
+            childrenFilePaths = map (fp </>) children
 
           directoryFilePaths <- filterM (doesDirectoryExist) childrenFilePaths
             
@@ -51,5 +53,15 @@ subdirectories fp = do
   else return [fp]
    
 (</>) :: FilePath -> FilePath -> FilePath
-(</>) cfp parent = parent ++ "/" ++ cfp
+(</>) parent cfp = parent ++ "/" ++ cfp
 
+-- | Checks for expressions in ~/.orange
+isIgnored :: FilePath -> IO Bool
+isIgnored fp = do
+  homeDirectory <- getHomeDirectory
+  ignoreRegex <- readFile $ homeDirectory </> ".orange"
+  let matches = (any (`isPrefixOf` fp) $ lines ignoreRegex)
+  putStrLn $ show $ lines $ ignoreRegex
+  when matches $ putStrLn $ fp ++ " was ignored"
+  return $ matches
+ 
