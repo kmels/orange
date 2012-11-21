@@ -5,6 +5,7 @@ import System.INotify
 import System.Directory(getDirectoryContents)
 import Control.Monad(when,filterM)
 import Data.List(isPrefixOf)
+import Text.Regex.TDFA
 
 main :: IO ()
 main = do
@@ -60,8 +61,8 @@ isIgnored :: FilePath -> IO Bool
 isIgnored fp = do
   homeDirectory <- getHomeDirectory
   ignoreRegex <- readFile $ homeDirectory </> ".orange"
-  let matches = (any (`isPrefixOf` fp) $ lines ignoreRegex)
-  putStrLn $ show $ lines $ ignoreRegex
+  let matches = (any (fp =~) $ lines ignoreRegex)
   when matches $ putStrLn $ fp ++ " was ignored"
+  --when (not matches) $ putStrLn " was not ignored"
   return $ matches
  
