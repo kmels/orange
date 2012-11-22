@@ -31,7 +31,7 @@ indexFilePath filePath redisConn = do
   putStr $ "mod time: " ++ (show fmt)
   mapM_ (\token -> runRedis redisConn $ do
             -- sort by modification date, we've just accessed it so all have the same access time
-            zadd ("search" <:> token) ([(unsafeCoerce fmt, toByteString fid)])
+            zadd ("search" <:> token) ([(realToFrac fmt, toByteString fid)])
         ) tokens
   putStrLn " ... done "
 

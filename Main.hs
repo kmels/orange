@@ -8,33 +8,51 @@ import Data.List(isPrefixOf)
 import Text.Regex.TDFA
 
 import Database.Redis
+
 import Indexer(indexFilePath)
+import Search(searchFilePaths)
 
+import System.Environment
+
+{-  | Usage
+
+orange index => indexes files + watches
+orange watch => watches
+orange search abc => output results 
+
+-}
 main :: IO ()
-main = do
-    inotify <- initINotify
-    print inotify
-    home <- getHomeDirectory        
+main = do  
+    args <- getArgs    
+    case args of 
+      ["index"] -> do
+        inotify <- initINotify
+        print inotify
+        home <- getHomeDirectory        
 
-    directories <- subdirectories (home)
-    --index
-    reditConn <- connect defaultConnectInfo
+        --get list of home subdirectories
+        directories <- subdirectories home        
+        --indexes subdirectories filepaths
+        reditConn <- connect defaultConnectInfo
     
-    --mapM $ (\fp -> runRedis reditConn $ do
-    --  set 
-    
-    {-wd <- mapM (\d -> addWatch
+        {-wd <- mapM (\d -> addWatch
             inotify
             [AllEvents]
             d
             --updateIndex 
             print) directories-}
     
-    --print wd
-    mapM_ (flip indexFilePath reditConn) directories
-    putStrLn "Listens to your home directory. Hit enter to terminate."
-    getLine
-    print ""
+        --print wd
+        mapM_ (flip indexFilePath reditConn) directories
+        putStrLn "Listens to your home directory. Hit enter to terminate."
+        getLine
+        print ""
+      ["search",query] -> do
+        conn <- connect defaultConnectInfo
+        results <- searchFilePaths query conn Nothing
+        mapM_ (putStrLn . show )results
+      _ -> do
+        putStrLn "Error, usage: `orange index` or `orange search <query`"
     --mapM_ removeWatch wd  
 
 updateIndex :: Event -> IO ()
@@ -51,7 +69,7 @@ subdirectories fp = do
   then do 
        children' <- getDirectoryContents fp -- :: [FilePath]
        let 
-          children = filter (`notElem` [".","..","_darcs",".config",".cabal"]) children'
+          children = filter (`notElem` [".",".."]) children'
           childrenFilePaths = map (fp </>) children
  
        directoryFilePaths <- filterM (doesDirectoryExist) childrenFilePaths
