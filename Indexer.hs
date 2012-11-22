@@ -11,29 +11,35 @@ import qualified Data.ByteString.Char8 as BS
 import System.Posix.Types(EpochTime)
 import Foreign.C.Types(CTime(..))
 import Unsafe.Coerce
+
+import Control.Exception(try,IOException(..))
         
 -- | Indexes something about the file in a redis database
 indexFilePath :: FilePath -> Connection -> IO ()
 indexFilePath filePath redisConn = do
-  fs <- getFileStatus filePath --get file status  
-  let
-    tokens = concatMap (drop 1 . inits) $ splitOn "/" filePath
-    fid = fileID fs
-    fat = accessTime fs
-    fmt = modificationTime fs
-    
   putStr $ "indexing " ++ filePath
-  _ <- runRedis redisConn $ do
-    set ("accessTime" <:> show fid) (toByteString fat)
-    set ("modificationTime" <:> show fid) (toByteString fmt)
-    set ("filePath" <:> show fid) (toByteString filePath)
-    
-  putStr $ "mod time: " ++ (show fmt)
-  mapM_ (\token -> runRedis redisConn $ do
-            -- sort by modification date, we've just accessed it so all have the same access time
-            zadd ("search" <:> token) ([(realToFrac fmt, toByteString fid)])
-        ) tokens
-  putStrLn " ... done "
+  fsEither <- try $ getFileStatus filePath  --get file status  
+  case fsEither of
+    Left e -> do 
+      putStrLn $ "... error, not indexed: " ++ show (e :: IOException)
+    Right fs -> do
+      let
+        tokens = concatMap (drop 1 . inits) $ splitOn "/" filePath
+        fid = fileID fs
+        fat = accessTime fs
+        fmt = modificationTime fs
+      
+      _ <- runRedis redisConn $ do
+        set ("accessTime" <:> show fid) (toByteString fat)
+        set ("modificationTime" <:> show fid) (toByteString fmt)
+        set ("filePath" <:> show fid) (toByteString filePath)  
+        
+      mapM_ (\token -> runRedis redisConn $ do 
+                -- sort by modification date 
+                zadd ("search" <:> token) ([(realToFrac fmt, toByteString fid)])
+            --we've just accessed it so all have the same access time
+            ) tokens
+      putStrLn " ... done "
 
 -- | Intercalates a colon. Used for redis key names.
 (<:>) :: String -> String -> ByteString

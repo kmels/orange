@@ -1,10 +1,11 @@
 import System.Directory
 import System.IO
+import System.IO.Unsafe
 
 import System.INotify
 import System.Directory(getDirectoryContents)
 import Control.Monad(when,filterM)
-import Data.List(isPrefixOf)
+import Data.List(isPrefixOf,partition)
 import Text.Regex.TDFA
 
 import Database.Redis
@@ -31,7 +32,7 @@ main = do
         home <- getHomeDirectory        
 
         --get list of home subdirectories
-        directories <- subdirectories home        
+        (watchDescriptors, directories) <- subfiles home
         --indexes subdirectories filepaths
         reditConn <- connect defaultConnectInfo
     
@@ -44,8 +45,10 @@ main = do
     
         --print wd
         mapM_ (flip indexFilePath reditConn) directories
-        putStrLn "Listens to your home directory. Hit enter to terminate."
+        putStrLn $ "I just indexed " ++ show (length directories) ++ " file paths"
+        putStrLn "and, I'm now listening to all the changes that happen to them. Hit enter to terminate, because I want to keep my index update!."
         getLine
+        
         print ""
       ["search",query] -> do
         conn <- connect defaultConnectInfo
@@ -61,8 +64,8 @@ updateIndex (Created isDirectory mfilePath) = putStrLn "Create file"
 updateIndex e  = putStrLn $ "Unhandled event " ++ (show e)
 
 -- | Gives a list of subdirectories given a directory
-subdirectories :: FilePath -> IO [FilePath]
-subdirectories fp = do
+subfiles :: FilePath -> IO ([FilePath],[FilePath])
+subfiles fp = do
   isDir <- doesDirectoryExist fp
   isIgnored <- isIgnored fp
   if (isDir && not isIgnored)
@@ -72,11 +75,22 @@ subdirectories fp = do
           children = filter (`notElem` [".",".."]) children'
           childrenFilePaths = map (fp </>) children
  
-       directoryFilePaths <- filterM (doesDirectoryExist) childrenFilePaths
-                   
-       allDescendants <- mapM subdirectories directoryFilePaths 
-       return $ directoryFilePaths ++ concat allDescendants
-  else return []
+       let (directoryFilePaths, normalFilePaths) = partition (unsafePerformIO . doesDirectoryExist) childrenFilePaths
+ 
+       allDescendants <- mapM subfiles directoryFilePaths
+       
+       return $ let                   
+                  dirs = concatMap fst allDescendants
+                  files = concatMap snd allDescendants       
+                in (directoryFilePaths ++ dirs, normalFilePaths ++ files)
+  else return ([],[])
+       
+watch :: FilePath -> INotify -> IO WatchDescriptor
+watch dirFilePath inotify = addWatch
+                 inotify
+                 [AllEvents]
+                 dirFilePath
+                 print
    
 (</>) :: FilePath -> FilePath -> FilePath
 (</>) parent cfp = parent ++ "/" ++ cfp
@@ -90,4 +104,9 @@ isIgnored fp = do
   when matches $ putStrLn $ fp ++ " was ignored"
   --when (not matches) $ putStrLn " was not ignored"
   return $ matches
+
+
+--  08005251378
+--  1
+  
  
