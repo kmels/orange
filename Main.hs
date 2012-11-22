@@ -16,29 +16,27 @@ main = do
     print inotify
     home <- getHomeDirectory        
 
-    directories <- subdirectories (home </> "code")
+    directories <- subdirectories (home)
     --index
     reditConn <- connect defaultConnectInfo
     
     --mapM $ (\fp -> runRedis reditConn $ do
     --  set 
     
-    wd <- mapM (\d -> addWatch
+    {-wd <- mapM (\d -> addWatch
             inotify
             [AllEvents]
             d
             --updateIndex 
-            print) directories
+            print) directories-}
     
-    print wd
-    mapM (\fp -> do
-             putStr $ "indexing " ++ fp
-             indexFilePath fp
-             putStrLn " ... done") directories    
+    --print wd
+    mapM_ (flip indexFilePath reditConn) directories
     putStrLn "Listens to your home directory. Hit enter to terminate."
     getLine
-    mapM_ removeWatch wd
-    
+    print ""
+    --mapM_ removeWatch wd  
+
 updateIndex :: Event -> IO ()
 updateIndex (Accessed isDirectory mfilePath) = putStrLn "Update access date"
 updateIndex (Created isDirectory mfilePath) = putStrLn "Create file"
@@ -55,7 +53,7 @@ subdirectories fp = do
        let 
           children = filter (`notElem` [".","..","_darcs",".config",".cabal"]) children'
           childrenFilePaths = map (fp </>) children
-                                
+ 
        directoryFilePaths <- filterM (doesDirectoryExist) childrenFilePaths
                    
        allDescendants <- mapM subdirectories directoryFilePaths 
