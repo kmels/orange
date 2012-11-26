@@ -15,10 +15,9 @@ category:            System
 build-type:          Simple
 cabal-version:       >=1.8
 
-executable orange
-  main-is:           System/Orange/Main.hs
-  -- other-modules:       
-  build-depends:       base ==4.5.*
+library
+    build-depends:    
+                    base ==4.5.*
                        , bytestring >= 0.9.2.1
                        , hinotify >= 0.3.5
                        , directory >= 1.1.0.2
@@ -26,3 +25,14 @@ executable orange
                        , split
                        , regex-tdfa >= 0.93.2
                        , unix >= 2.5.1
+
+    exposed-modules:                       
+                    System.Orange.Filesystem                    
+                    System.Orange.Indexer
+                    System.Orange.Search
+
+executable orange
+  main-is:           Main.hs
+  -- other-modules:       
+  build-depends:      
+                    base, bytestring, hedis, orange, unix, regex-tdfa, directory, split, hinotify
