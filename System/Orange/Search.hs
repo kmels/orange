@@ -12,7 +12,7 @@ import           Database.Redis
 searchFilePaths :: String -> Connection -> Int -> Int -> IO [BS.ByteString]
 searchFilePaths query redisConn from resultsCount = do
   fids <- runRedis redisConn $ do
-    zrange ("search" <:> query) (fromIntegral from) (fromIntegral resultsCount) -- :: Either Reply [BS.ByteString]
+    zrange ("search" <:> ("*" ++ query ++ "*")) (fromIntegral from) (fromIntegral resultsCount) -- :: Either Reply [BS.ByteString]
   case fids of
     (Right fids') -> do
       filePathMaybes <- mapM (\fid -> runRedis redisConn $ do

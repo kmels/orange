@@ -33,7 +33,9 @@ indexFilePath filePath redisConn = do
       _ <- runRedis redisConn $ do
         set ("accessTime" <:> show fid) (toByteString fat)
         set ("modificationTime" <:> show fid) (toByteString fmt)
-        set ("filePath" <:> show fid) (BS.pack filePath)
+        --useful for searching with wildcards
+        --e.g. for queries like dir/dir'
+        set ("filePath" <:> filePath) (BS.pack . show $ fid)
 
       mapM_ (\token -> runRedis redisConn $ do
                 -- sort by modification date
